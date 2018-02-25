@@ -45,6 +45,17 @@ open class Changeable<T> {
     }
 
     // MARK: Changes
+    public func set<V: Equatable>(for keyPath: WritableKeyPath<T, V>, value: V) {
+        guard self.value[keyPath: keyPath] != value else {
+            return
+        }
+
+        pendingChanges.insert(keyPath)
+        pendingAppliers[keyPath.hashValue] = { [weak self] in
+            self?.value[keyPath: keyPath] = value
+        }
+    }
+
     public func set<V>(for keyPath: WritableKeyPath<T, V>, value: V) {
         pendingChanges.insert(keyPath)
         pendingAppliers[keyPath.hashValue] = { [weak self] in
@@ -54,9 +65,9 @@ open class Changeable<T> {
 
     public func commit() {
         pendingAppliers.forEach({ $0.value() })
-        let change = Change(value: value, changedKeyPaths: self.pendingChanges)
+        let change = Change(value: value, changedKeyPaths: pendingChanges)
         observers
-            .filter({ (key, observer) -> Bool in
+            .filter({ (_, observer) -> Bool in
                 guard let queryKeyPathHashes = observer.query else { return true }
                 for hash in queryKeyPathHashes {
                     if pendingAppliers[hash] == nil {
